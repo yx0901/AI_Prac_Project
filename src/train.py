@@ -1,10 +1,12 @@
 import torch
 import torch.nn as nn
+import os
+import argparse
 from torch.utils.data import DataLoader, random_split
 from dataset import ChineseCharDataset
 from model import CNN
 
-def train():
+def train(resume=False):
     BATCH_SIZE = 32
     EPOCHS = 5
     LEARNING_RATE = 0.001
@@ -27,9 +29,22 @@ def train():
     model = CNN(num_classes=len(dataset.classes)).to(DEVICE)
     criterion = nn.CrossEntropyLoss()
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
+    os.makedirs('models', exist_ok=True)
+    checkpoint_path = 'models/cnn.pth'
+    start_epoch = 0
+
+    if resume and os.path.exists(checkpoint_path):
+        checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
+        model.load_state_dict(checkpoint['model_state_dict'])
+        if 'optimizer_state_dict' in checkpoint:
+            optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+        start_epoch = checkpoint.get('epoch', 0)
+        print(f"Resuming from epoch {start_epoch}.")
+    elif resume:
+        print("No checkpoint found. Starting fresh training.")
     
     # Training loop
-    for epoch in range(EPOCHS):
+    for epoch in range(start_epoch, EPOCHS):
         model.train()
         total_loss = 0
         
@@ -61,14 +76,24 @@ def train():
         
         val_acc = 100 * correct / total
         print(f"Epoch [{epoch+1}/{EPOCHS}] Loss: {total_loss/len(train_loader):.4f} Val Acc: {val_acc:.2f}%")
+
+        checkpoint = {
+            'epoch': epoch + 1,
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'classes': dataset.classes,
+            'class_to_idx': dataset.class_to_idx,
+        }
+
+        # Keep an epoch-specific file and update the latest checkpoint every epoch.
+        torch.save(checkpoint, f"models/cnn_epoch_{epoch+1}.pth")
+        torch.save(checkpoint, 'models/cnn.pth')
+        print(f"Saved checkpoint: models/cnn_epoch_{epoch+1}.pth")
     
-    # Save model
-    torch.save({
-        'model_state_dict': model.state_dict(),
-        'classes': dataset.classes,
-        'class_to_idx': dataset.class_to_idx,
-    }, 'models/cnn.pth')
-    print("Model saved!")
+    print("Training finished. Latest model: models/cnn.pth")
 
 if __name__ == '__main__':
-    train()
+    parser = argparse.ArgumentParser(description='Train Chinese character classifier')
+    parser.add_argument('--resume', action='store_true', help='Resume from models/cnn.pth if available')
+    args = parser.parse_args()
+    train(resume=args.resume)
