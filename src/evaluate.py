@@ -5,7 +5,6 @@ from torch.utils.data import DataLoader
 from dataset import ChineseCharDataset
 from model import CNN
 
-
 def top_k_accuracy(outputs, labels, k=3):
 	_, top_k_preds = torch.topk(outputs, k=min(k, outputs.size(1)), dim=1)
 	labels_expanded = labels.unsqueeze(1).expand_as(top_k_preds)

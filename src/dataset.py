@@ -25,6 +25,7 @@ def build_training_transform():
         ),
         transforms.RandomPerspective(distortion_scale=0.15, p=0.3, fill=255),
         transforms.Grayscale(),
+        transforms.RandomInvert(p=0.5),
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])
