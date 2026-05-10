@@ -27,7 +27,7 @@ def train(resume=False):
     
     # Model, loss, optimizer
     model = CNN(num_classes=len(dataset.classes)).to(DEVICE)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = torch.optim.Adam(model.parameters(), lr=LEARNING_RATE)
     os.makedirs('models', exist_ok=True)
     checkpoint_path = 'models/cnn.pth'

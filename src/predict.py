@@ -29,6 +29,8 @@ def predict(image_path, model_path='models/cnn.pth'):
     transform = transforms.Compose([
         transforms.Grayscale(),
         transforms.Resize((64, 64)),
+        transforms.RandomRotation(degrees=10),
+        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), shear = 5),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])
     ])
