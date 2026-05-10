@@ -25,12 +25,10 @@ def predict(image_path, model_path='models/cnn.pth'):
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     
-    # Preprocess image (same as training)
+    # Preprocess image with deterministic evaluation-style transforms.
     transform = transforms.Compose([
         transforms.Grayscale(),
         transforms.Resize((64, 64)),
-        transforms.RandomRotation(degrees=10),
-        transforms.RandomAffine(degrees=0, translate=(0.1, 0.1), shear = 5),
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])
     ])
@@ -43,15 +41,25 @@ def predict(image_path, model_path='models/cnn.pth'):
         outputs = model(image)
         probabilities = torch.softmax(outputs, dim=1)
         confidence, predicted_idx = torch.max(probabilities, 1)
+        top_probabilities, top_indices = torch.topk(probabilities, k=min(3, len(classes)), dim=1)
     
     predicted_char = classes[predicted_idx.item()]
     confidence_pct = confidence.item() * 100
+    top_suggestions = [
+        (classes[idx.item()], prob.item() * 100)
+        for idx, prob in zip(top_indices[0], top_probabilities[0])
+    ]
+
+    print("Top 3 suggestions:")
+    for rank, (label, score) in enumerate(top_suggestions, start=1):
+        print(f"  {rank}. {label} ({score:.1f}% confidence)")
+
     if confidence_pct < 60:
       print(f"Not quite sure but this might be a {predicted_char} ({confidence_pct:.1f}% confidence)")
-      return predicted_char, confidence_pct
+      return predicted_char, confidence_pct, top_suggestions
     else:
       print(f"Predicted: {predicted_char} ({confidence_pct:.1f}% confidence)")
-      return predicted_char, confidence_pct
+      return predicted_char, confidence_pct, top_suggestions
 
 if __name__ == '__main__':
     import sys

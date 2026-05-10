@@ -6,6 +6,12 @@ from dataset import ChineseCharDataset
 from model import CNN
 
 
+def top_k_accuracy(outputs, labels, k=3):
+	_, top_k_preds = torch.topk(outputs, k=min(k, outputs.size(1)), dim=1)
+	labels_expanded = labels.unsqueeze(1).expand_as(top_k_preds)
+	correct = (top_k_preds == labels_expanded).any(dim=1).sum().item()
+	return correct / labels.size(0)
+
 def evaluate(model_path='models/cnn.pth', test_dir='data/test', batch_size=32):
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -38,6 +44,7 @@ def evaluate(model_path='models/cnn.pth', test_dir='data/test', batch_size=32):
 
 	total = 0
 	correct = 0
+	top3_correct = 0
 
 	per_class_total = {c: 0 for c in classes}
 	per_class_correct = {c: 0 for c in classes}
@@ -53,6 +60,7 @@ def evaluate(model_path='models/cnn.pth', test_dir='data/test', batch_size=32):
 
 			outputs = model(images)
 			preds = torch.argmax(outputs, dim=1)
+			top3_correct += top_k_accuracy(outputs, mapped_labels, k=3) * mapped_labels.size(0)
 
 			total += mapped_labels.size(0)
 			correct += (preds == mapped_labels).sum().item()
@@ -67,8 +75,10 @@ def evaluate(model_path='models/cnn.pth', test_dir='data/test', batch_size=32):
 		raise ValueError(f"No test images found in '{test_dir}'.")
 
 	accuracy = 100.0 * correct / total
+	top3_accuracy = 100.0 * top3_correct / total
 	print(f"Test samples: {total}")
 	print(f"Test accuracy: {accuracy:.2f}%")
+	print(f"Top-3 accuracy: {top3_accuracy:.2f}%")
 
 	print("\nPer-class accuracy:")
 	for class_name in classes:
