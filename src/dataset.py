@@ -3,18 +3,40 @@ from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
 
+
+def build_default_transform():
+    return transforms.Compose([
+        transforms.Grayscale(),
+        transforms.Resize((64, 64)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5], [0.5])
+    ])
+
+
+def build_training_transform():
+    return transforms.Compose([
+        transforms.RandomRotation(10, fill=255),
+        transforms.RandomAffine(
+            degrees=10,
+            translate=(0.1, 0.1),
+            scale=(0.9, 1.1),
+            shear=5,
+            fill=255,
+        ),
+        transforms.RandomPerspective(distortion_scale=0.15, p=0.3, fill=255),
+        transforms.Grayscale(),
+        transforms.Resize((64, 64)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.5], [0.5])
+    ])
+
 class ChineseCharDataset(Dataset):
     def __init__(self, root_dir='data/train', transform=None):
         self.root_dir = root_dir
-        self.transform = transform or transforms.Compose([
-            transforms.Grayscale(),
-            transforms.Resize((64, 64)),
-            transforms.ToTensor(),
-            transforms.Normalize([0.5], [0.5])
-        ])
+        self.transform = transform or build_default_transform()
         
         # Find all the chracter classes
-        all_items = os.listdir(root_dir)
+        all_items = sorted(os.listdir(root_dir))
         folder_names = []
         for item in all_items:
             item_path = os.path.join(root_dir, item)
@@ -33,12 +55,12 @@ class ChineseCharDataset(Dataset):
         # Collect all image paths and labels
         self.samples = []
         for character in self.classes:
-          folder_path = os.path.join(root_dir, character)
-          label = self.class_to_idx[character]
-          for img_name in os.listdir(folder_path):
-            if img_name.lower().endswith(('.jpg', '.png')):
-                img_path = os.path.join(folder_path, img_name)
-                self.samples.append((img_path, label))
+            folder_path = os.path.join(root_dir, character)
+            label = self.class_to_idx[character]
+            for img_name in sorted(os.listdir(folder_path)):
+                if img_name.lower().endswith(('.jpg', '.png')):
+                    img_path = os.path.join(folder_path, img_name)
+                    self.samples.append((img_path, label))
     
     def __len__(self):
         return len(self.samples)

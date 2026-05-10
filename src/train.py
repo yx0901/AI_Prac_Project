@@ -2,8 +2,8 @@ import torch
 import torch.nn as nn
 import os
 import argparse
-from torch.utils.data import DataLoader, random_split
-from dataset import ChineseCharDataset
+from torch.utils.data import DataLoader, random_split, Subset
+from dataset import ChineseCharDataset, build_default_transform, build_training_transform
 from model import CNN
 
 
@@ -11,14 +11,20 @@ def train(resume=False, epochs=5, patience=5, batch_size=32, learning_rate=0.001
     DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     # Load data
-    dataset = ChineseCharDataset()
+    dataset = ChineseCharDataset(transform=build_default_transform())
     print(f"Classes: {dataset.classes}")
     print(f"Total samples: {len(dataset)}")
 
     # Split into train/validation (80/20) deterministically
     train_size = int(0.8 * len(dataset))
     val_size = len(dataset) - train_size
-    train_set, val_set = random_split(dataset, [train_size, val_size])
+    generator = torch.Generator().manual_seed(42)
+    train_subset, val_subset = random_split(dataset, [train_size, val_size], generator=generator)
+
+    train_dataset = ChineseCharDataset(transform=build_training_transform())
+    val_dataset = ChineseCharDataset(transform=build_default_transform())
+    train_set = Subset(train_dataset, train_subset.indices)
+    val_set = Subset(val_dataset, val_subset.indices)
 
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_set, batch_size=batch_size)

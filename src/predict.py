@@ -1,7 +1,8 @@
 import torch
-from PIL import Image
-from torchvision import transforms
+from PIL import Image, ImageOps
+import numpy as np
 from model import CNN
+from dataset import build_default_transform
 import os
 
 def predict(image_path, model_path='models/cnn.pth'):
@@ -25,16 +26,40 @@ def predict(image_path, model_path='models/cnn.pth'):
     model.load_state_dict(checkpoint['model_state_dict'])
     model.eval()
     
-    # Preprocess image with deterministic evaluation-style transforms.
-    transform = transforms.Compose([
-        transforms.Grayscale(),
-        transforms.Resize((64, 64)),
-        transforms.ToTensor(),
-        transforms.Normalize([0.5], [0.5])
-    ])
-    
-    image = Image.open(image_path).convert('RGB')
-    image = transform(image).unsqueeze(0).to(DEVICE)  # Add batch dimension
+    # Small user-image preprocessing: crop to ink bbox, pad to square, resize.
+    def preprocess_user_image(pil_img, target_size=64, thresh=200):
+      img = pil_img.convert('L')
+      arr = np.array(img)
+
+      # If background is dark, invert so strokes are dark on light background
+      if arr.mean() < 127:
+        img = ImageOps.invert(img)
+        arr = np.array(img)
+
+      # Find ink bbox
+      mask = arr < thresh
+      if mask.any():
+        ys, xs = np.where(mask)
+        bbox = (xs.min(), ys.min(), xs.max() + 1, ys.max() + 1)
+        img = img.crop(bbox)
+
+      # Pad to square and center
+      w, h = img.size
+      size = max(w, h)
+      canvas = Image.new('L', (size, size), 255)
+      paste_x = (size - w) // 2
+      paste_y = (size - h) // 2
+      canvas.paste(img, (paste_x, paste_y))
+
+      canvas = canvas.resize((target_size, target_size), Image.LANCZOS)
+      return canvas.convert('RGB')
+
+    # Reuse the same transform as the dataset to ensure preprocessing parity.
+    transform = build_default_transform()
+
+    raw = Image.open(image_path)
+    preprocessed = preprocess_user_image(raw, target_size=64)
+    image = transform(preprocessed).unsqueeze(0).to(DEVICE)  # Add batch dimension
     
     # Predict
     with torch.no_grad():

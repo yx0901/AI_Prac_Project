@@ -8,14 +8,13 @@ A deep learning system for recognizing handwritten Chinese characters using PyTo
 ### First install PyTorch and other dependencies:
 pip install -r requirements.txt
 
-### To train the model:
-python src/train.py
-
-### To predict on a new image example:
-python src/predict.py data/user_input/0.png
-
 ## Commands
-**Train** (with checkpointing, LR scheduling, and early stopping):
+**Train** 
+```bash
+python src/train.py
+```
+or 
+(with checkpointing, LR scheduling, and early stopping):
 ```bash
 python src/train.py --epochs 20 --batch-size 64 --learning-rate 1e-3 --patience 5
 ```
@@ -26,6 +25,9 @@ python src/train.py --resume
 ```
 
 **Evaluate** (top-1 and top-3 accuracy with per-class breakdown):
+```bash
+python3 src/evaluate.py
+```
 ```bash
 python src/evaluate.py --model models/cnn.pth --test-dir data/test --batch-size 32
 ```
