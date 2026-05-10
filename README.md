@@ -37,5 +37,17 @@ python src/evaluate.py --model models/cnn.pth --test-dir data/test --batch-size 
 python src/predict.py data/user_input/0.png
 ```
 
+Run without arguments to keep the model loaded and predict multiple images in one session:
+```bash
+python3 src/predict.py
+```
+
+Example session:
+```text
+Model loaded. Enter an image path, or type 'quit' to exit.
+Image path> data/user_input/100.jpg
+Image path> quit
+```
+
 ## Checkpoints
 Checkpoints are saved to `models/cnn.pth` with per-epoch snapshots. Each checkpoint includes the model, optimizer, and scheduler state, class mappings, and best validation accuracy. Use `--resume` to continue training from the latest checkpoint.
