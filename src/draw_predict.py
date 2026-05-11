@@ -13,7 +13,7 @@ class DrawPredictApp:
     def __init__(self, model_path: str, canvas_size: int = 320, brush_size: int = 8):
         self.model_path = model_path
         self.canvas_size = canvas_size
-        self.brush_size = max(2, int(brush_size))
+        self.brush_size = max(2, min(6, int(brush_size)))
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model, self.classes = load_model(model_path, self.device)
@@ -65,7 +65,7 @@ class DrawPredictApp:
         brush_scale = ttk.Scale(
             size_row,
             from_=2,
-            to=20,
+            to=6,
             orient=tk.HORIZONTAL,
             command=self.on_brush_change,
         )
@@ -130,7 +130,7 @@ class DrawPredictApp:
         self.pil_draw.ellipse((x - r, y - r, x + r, y + r), fill=255)
 
     def on_brush_change(self, value):
-        self.brush_size = max(2, int(float(value)))
+        self.brush_size = max(2, min(6, int(float(value))))
         self.brush_label_var.set(str(self.brush_size))
 
     def _prepare_model_input(self) -> torch.Tensor:
@@ -187,7 +187,7 @@ def main():
     parser = argparse.ArgumentParser(description="Popup drawing board for character prediction")
     parser.add_argument("--model", default="models/cnn.pth", help="Path to model checkpoint")
     parser.add_argument("--canvas-size", type=int, default=320, help="Canvas width/height in pixels")
-    parser.add_argument("--brush", type=int, default=8, help="Brush size")
+    parser.add_argument("--brush", type=int, default=4, help="Brush size (2-6)")
     args = parser.parse_args()
 
     if not os.path.exists(args.model):

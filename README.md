@@ -42,6 +42,12 @@ python src/evaluate.py --model models/cnn.pth --test-dir data/test --batch-size 
 python src/predict.py data/user_input/0.png
 ```
 
+**Draw and Predict** (popup blackboard input):
+```bash
+python3 src/draw_predict.py
+```
+Use the Pen size slider for thinner strokes, then click Predict.
+
 Run without arguments to keep the model loaded and predict multiple images in one session:
 ```bash
 python3 src/predict.py
