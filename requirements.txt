@@ -6,3 +6,7 @@ torchvision>=0.15.0
 numpy>=1.24.0
 pillow>=9.5.0
 scipy>=1.10.0
+
+# GUI dependency note:
+# tkinter is not installed via pip on most Linux distributions.
+# Install with: sudo apt-get install python3-tk

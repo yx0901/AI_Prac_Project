@@ -8,6 +8,11 @@ A deep learning system for recognizing handwritten Chinese characters using PyTo
 ### First install PyTorch and other dependencies:
 pip install -r requirements.txt
 
+If you want to use the popup drawing board tool, install tkinter as a system package on Linux:
+```bash
+sudo apt-get install python3-tk
+```
+
 ## Commands
 **Train** 
 ```bash

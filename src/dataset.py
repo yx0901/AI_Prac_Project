@@ -2,6 +2,8 @@ import os
 from PIL import Image
 from torch.utils.data import Dataset
 from torchvision import transforms
+import torchvision.transforms.functional as F
+import torch
 
 
 def build_default_transform():
@@ -11,6 +13,19 @@ def build_default_transform():
         transforms.ToTensor(),
         transforms.Normalize([0.5], [0.5])
     ])
+
+
+class GaussianNoise:
+    """Add Gaussian noise to simulate scanned/noisy documents"""
+    def __init__(self, mean=0, std=0.02):
+        self.mean = mean
+        self.std = std
+    
+    def __call__(self, img):
+        if isinstance(img, Image.Image):
+            img = F.to_tensor(img)
+        noise = torch.randn_like(img) * self.std + self.mean
+        return torch.clamp(img + noise, 0, 1)
 
 
 def build_training_transform():
@@ -28,6 +43,8 @@ def build_training_transform():
         transforms.RandomInvert(p=0.5),
         transforms.Resize((64, 64)),
         transforms.ToTensor(),
+        transforms.GaussianBlur(kernel_size=3, sigma=(0.1, 0.5)),
+        GaussianNoise(mean=0, std=0.02),
         transforms.Normalize([0.5], [0.5])
     ])
 

@@ -13,7 +13,7 @@ def top_k_accuracy(outputs, labels, k=3):
 
 def evaluate(model_path='models/cnn.pth', test_dir='data/test', batch_size=32):
 	device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+# 
 	# Load checkpoint from training.
 	checkpoint = torch.load(model_path, map_location=device)
 	classes = checkpoint['classes']

@@ -4,6 +4,7 @@ import numpy as np
 from torchvision import transforms
 from model import CNN
 import os
+from scipy import ndimage
 
 
 PREDICT_TRANSFORM = transforms.Compose([
@@ -25,48 +26,39 @@ def preprocess_user_image(pil_img, target_size=64, thresh=200):
   img = pil_img.convert('L')
   arr = np.array(img)
 
-  # If background is dark, invert so strokes are dark on light background
+  # Small, already-cropped inputs should stay close to training distribution.
+  if max(img.size) <= 96:
+    return img.resize((target_size, target_size), Image.LANCZOS)
+
+  # For phone photos/scans, stretch contrast and normalize polarity.
+  img = ImageOps.autocontrast(img, cutoff=2)
+  arr = np.array(img)
   if arr.mean() < 127:
     img = ImageOps.invert(img)
     arr = np.array(img)
-  # Determine ink vs background polarity robustly (invert only if needed)
-  mask = arr < thresh
-  training_strokes_are_bright = False
-  try:
-    # auto-detect training polarity from a representative training image
-    train_ds = ChineseCharDataset(root_dir='data/train')
-    if train_ds.samples:
-      sample_path, _ = train_ds.samples[0]
-      sample = Image.open(sample_path).convert('L')
-      s_arr = np.array(sample)
-      s_mask = s_arr < thresh
-      if s_mask.any():
-        s_ink_mean = s_arr[s_mask].mean()
-        s_bg_mean = s_arr[~s_mask].mean()
-        training_strokes_are_bright = bool(s_ink_mean > s_bg_mean)
-  except Exception:
-    # fallback: assume strokes are dark on light background (common)
-    training_strokes_are_bright = False
 
+  # Foreground estimate for document photos.
+  fg_thresh = int(np.clip(np.percentile(arr, 18), 40, thresh))
+  mask = arr < fg_thresh
+
+  # Keep the largest connected component to suppress page texture/noise.
   if mask.any():
-    ink_mean = arr[mask].mean()
-    bg_mean = arr[~mask].mean()
-    strokes_are_bright = bool(ink_mean > bg_mean)
-  else:
-    strokes_are_bright = arr.mean() > 127
-
-  if strokes_are_bright != training_strokes_are_bright:
-    img = ImageOps.invert(img)
-    arr = np.array(img)
-
-  # Find ink bbox
-  mask = arr < thresh
-  if mask.any():
-    ys, xs = np.where(mask)
-    pad = 10
-    bbox = (max(0, xs.min()-pad), max(0, ys.min()-pad), 
-        min(arr.shape[1], xs.max()+pad+1), min(arr.shape[0], ys.max()+pad+1))
-    img = img.crop(bbox)
+    labeled, num_features = ndimage.label(mask)
+    if num_features > 0:
+      sizes = ndimage.sum(mask, labeled, index=range(1, num_features + 1))
+      largest_label = int(np.argmax(sizes) + 1)
+      comp_mask = labeled == largest_label
+      ys, xs = np.where(comp_mask)
+      if ys.size > 0 and xs.size > 0:
+        pad_x = max(8, int(0.05 * arr.shape[1]))
+        pad_y = max(8, int(0.05 * arr.shape[0]))
+        bbox = (
+          max(0, xs.min() - pad_x),
+          max(0, ys.min() - pad_y),
+          min(arr.shape[1], xs.max() + pad_x + 1),
+          min(arr.shape[0], ys.max() + pad_y + 1),
+        )
+        img = img.crop(bbox)
 
   # Pad to square and center
   w, h = img.size
@@ -92,38 +84,21 @@ def predict(image_path, model, classes, device):
 
   raw = Image.open(image_path)
   preprocessed = preprocess_user_image(raw, target_size=64)
-  candidates = [
-    ("original", preprocessed),
-    ("inverted", ImageOps.invert(preprocessed)),
-  ]
-
-  best = None
   with torch.inference_mode():
-    for polarity_name, candidate_img in candidates:
-      image = PREDICT_TRANSFORM(candidate_img).unsqueeze(0).to(device)
-      outputs = model(image)
-      probabilities = torch.softmax(outputs, dim=1)
-      confidence, predicted_idx = torch.max(probabilities, 1)
-      if best is None or confidence.item() > best["confidence"]:
-        best = {
-          "polarity": polarity_name,
-          "confidence": confidence.item(),
-          "predicted_idx": predicted_idx.item(),
-          "probabilities": probabilities,
-        }
+    image = PREDICT_TRANSFORM(preprocessed).unsqueeze(0).to(device)
+    outputs = model(image)
+    probabilities = torch.softmax(outputs, dim=1)
+    confidence, predicted_idx = torch.max(probabilities, 1)
 
-  probabilities = best["probabilities"]
-  predicted_idx = best["predicted_idx"]
-  confidence_pct = best["confidence"] * 100
+  confidence_pct = confidence.item() * 100
   top_probabilities, top_indices = torch.topk(probabilities, k=min(3, len(classes)), dim=1)
 
-  predicted_char = classes[predicted_idx]
+  predicted_char = classes[predicted_idx.item()]
   top_suggestions = [
     (classes[idx.item()], prob.item() * 100)
     for idx, prob in zip(top_indices[0], top_probabilities[0])
   ]
 
-  print(f"Using best polarity path: {best['polarity']}")
   print("Top 3 suggestions:")
   for rank, (label, score) in enumerate(top_suggestions, start=1):
     print(f"  {rank}. {label} ({score:.1f}% confidence)")
